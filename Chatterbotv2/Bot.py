@@ -19,29 +19,36 @@ chatbot = ChatBot(
     database_uri='sqlite:///my_bot_database.sqlite3'  # Using the existing SQLite database
 )
 
-# Path to the file that will store the chat history
-history_file = 'chat_history.json'
+# Folder to store the chat histories of different sessions
+history_folder = 'chat_histories'
 
-# Load chat history from file
-def load_chat_history():
+# Ensure the folder exists
+if not os.path.exists(history_folder):
+    os.makedirs(history_folder)
+
+# Load chat history for a specific session
+def load_chat_history(session_id):
+    history_file = os.path.join(history_folder, f'{session_id}.json')
     if os.path.exists(history_file):
         with open(history_file, 'r') as file:
             return json.load(file)
     return []
 
-# Save chat history to file
-def save_chat_history():
+# Save chat history for a specific session
+def save_chat_history(session_id, chat_history):
+    history_file = os.path.join(history_folder, f'{session_id}.json')
     with open(history_file, 'w') as file:
         json.dump(chat_history, file)
-
-# Initialize chat history (load from file)
-chat_history = load_chat_history()
 
 # Define an endpoint for chatting
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
     user_message = data.get("message")
+    session_id = data.get("session_id")  # Get session_id from the request
+
+    # Load the session-specific chat history
+    chat_history = load_chat_history(session_id)
 
     # Get response from chatbot
     bot_response = chatbot.get_response(user_message)
@@ -53,14 +60,16 @@ def chat():
     })
 
     # Save updated chat history to file
-    save_chat_history()
+    save_chat_history(session_id, chat_history)
 
     # Return response in JSON format
     return jsonify({'response': str(bot_response)})
 
-# Define an endpoint to get chat history
+# Define an endpoint to get chat history for a specific session
 @app.route('/history', methods=['GET'])
 def history():
+    session_id = request.args.get('session_id')  # Get session_id from the query params
+    chat_history = load_chat_history(session_id)
     return jsonify(chat_history)
 
 if __name__ == '__main__':
